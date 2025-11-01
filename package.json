@@ -1,0 +1,19 @@
+{
+    "name": "todo-backend",
+    "version": "1.0.0",
+    "description": "Todo backend API server",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "node --watch index.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "mongodb": "^6.20.0"
+    }
+}
