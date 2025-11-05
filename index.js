@@ -81,14 +81,32 @@ async function connectToMongoDB() {
     try {
         isConnecting = true;
         console.log('MongoDB 연결 시도 중...');
-        mongoClient = new MongoClient(MONGODB_URI);
+        console.log(`DB_NAME: ${DB_NAME}`);
+        // 연결 문자열의 민감한 정보는 숨기고 로그 출력
+        const uriDisplay = MONGODB_URI.replace(/\/\/.*@/, '//***:***@');
+        console.log(`MongoDB URI: ${uriDisplay}`);
+        
+        mongoClient = new MongoClient(MONGODB_URI, {
+            serverSelectionTimeoutMS: 10000, // 10초 타임아웃
+            connectTimeoutMS: 10000
+        });
+        
         await mongoClient.connect();
         db = mongoClient.db(DB_NAME);
         console.log('✅ MongoDB 연결 성공!');
         isConnecting = false;
         return true;
     } catch (error) {
-        console.error('❌ MongoDB 연결 실패:', error.message);
+        console.error('❌ MongoDB 연결 실패:');
+        console.error(`에러 타입: ${error.name}`);
+        console.error(`에러 메시지: ${error.message}`);
+        if (error.message.includes('authentication')) {
+            console.error('💡 인증 실패: MongoDB 사용자 이름/비밀번호를 확인하세요.');
+        } else if (error.message.includes('timeout') || error.message.includes('ENOTFOUND')) {
+            console.error('💡 네트워크 오류: MongoDB Atlas IP 화이트리스트에 0.0.0.0/0을 추가하세요.');
+            console.error('   또는 MongoDB Atlas → Network Access → Add IP Address → 0.0.0.0/0');
+        }
+        console.error(`전체 에러:`, error);
         isConnecting = false;
         return false;
     }
