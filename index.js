@@ -165,15 +165,14 @@ async function checkConnection() {
 
 // MongoDB 재연결 시도
 async function reconnectToMongoDB() {
-    if (process.env.NODE_ENV !== 'production') {
-        console.log('MongoDB 재연결 시도...');
-    }
+    console.log('MongoDB 재연결 시도...');
     const connected = await connectToMongoDB();
     if (!connected) {
+        console.log('재연결 실패. 나중에 다시 시도합니다.');
+        // 프로덕션에서는 서버를 재시작하지 않고 계속 재시도
         if (process.env.NODE_ENV !== 'production') {
-            console.log('재연결 실패. 서버 재시작 예정...');
+            restartServer();
         }
-        restartServer();
     }
 }
 
