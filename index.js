@@ -219,13 +219,18 @@ async function startServer() {
     
     if (!connected) {
         console.log('⚠️ MongoDB 초기 연결 실패. 서버는 시작되지만 DB 연결은 백그라운드에서 재시도됩니다.');
-        // 백그라운드에서 주기적으로 재연결 시도 (프로덕션에서는 30초마다)
-        const reconnectInterval = process.env.NODE_ENV === 'production' ? 30000 : 10000;
+        // 백그라운드에서 주기적으로 재연결 시도 (프로덕션에서는 60초마다로 증가 - 메모리 절약)
+        const reconnectInterval = process.env.NODE_ENV === 'production' ? 60000 : 10000;
         const reconnectTimer = setInterval(async () => {
             const reconnected = await connectToMongoDB();
             if (reconnected) {
                 console.log('✅ MongoDB 재연결 성공!');
                 clearInterval(reconnectTimer);
+            } else {
+                // 재연결 실패 로그는 프로덕션에서 줄이기
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log(`⏳ MongoDB 재연결 실패. ${reconnectInterval/1000}초 후 다시 시도합니다.`);
+                }
             }
         }, reconnectInterval);
     } else {
