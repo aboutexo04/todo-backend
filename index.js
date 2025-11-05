@@ -79,20 +79,21 @@ async function connectToMongoDB() {
     if (isConnecting) {
         return false;
     }
-    
+
     // 환경 변수 확인
     if (!MONGODB_URI || MONGODB_URI === 'mongodb://localhost:27017') {
         console.error('❌ MONGODB_URI 환경 변수가 설정되지 않았습니다.');
+        console.error(`현재 MONGODB_URI: ${MONGODB_URI || 'undefined'}`);
         return false;
     }
-    
+
     try {
         isConnecting = true;
         console.log('MongoDB 연결 시도 중...');
         console.log(`DB_NAME: ${DB_NAME}`);
         // 연결 문자열의 민감한 정보는 숨기고 로그 출력
         const uriDisplay = MONGODB_URI.replace(/\/\/.*@/, '//***:***@');
-        console.log(`MongoDB URI: ${uriDisplay}`);
+        console.log(`MongoDB URI 형식: ${uriDisplay}`);
         
         // MongoDB 연결 옵션 (메모리 최적화 및 SSL 설정)
         mongoClient = new MongoClient(MONGODB_URI, {
@@ -113,13 +114,26 @@ async function connectToMongoDB() {
         console.error('❌ MongoDB 연결 실패:');
         console.error(`에러 타입: ${error.name}`);
         console.error(`에러 메시지: ${error.message}`);
-        if (error.message.includes('authentication')) {
+        console.error(`에러 코드: ${error.code || 'N/A'}`);
+
+        if (error.message.includes('authentication') || error.message.includes('auth')) {
             console.error('💡 인증 실패: MongoDB 사용자 이름/비밀번호를 확인하세요.');
-        } else if (error.message.includes('timeout') || error.message.includes('ENOTFOUND')) {
-            console.error('💡 네트워크 오류: MongoDB Atlas IP 화이트리스트에 0.0.0.0/0을 추가하세요.');
-            console.error('   또는 MongoDB Atlas → Network Access → Add IP Address → 0.0.0.0/0');
+            console.error('   - MongoDB Atlas → Database Access → 사용자 권한 확인');
+        } else if (error.message.includes('timeout') || error.message.includes('ENOTFOUND') || error.message.includes('ETIMEDOUT')) {
+            console.error('💡 네트워크 오류: MongoDB Atlas IP 화이트리스트 설정을 확인하세요.');
+            console.error('   ⭐ MongoDB Atlas → Network Access → ADD IP ADDRESS → ALLOW ACCESS FROM ANYWHERE (0.0.0.0/0)');
+        } else if (error.message.includes('ECONNREFUSED')) {
+            console.error('💡 연결 거부: MongoDB 서버 주소를 확인하세요.');
         }
-        console.error(`전체 에러:`, error);
+
+        // 상세 에러 로그 (프로덕션에서도 표시)
+        console.error(`상세 에러 정보:`, JSON.stringify({
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            stack: error.stack?.split('\n')[0]
+        }, null, 2));
+
         isConnecting = false;
         return false;
     }
