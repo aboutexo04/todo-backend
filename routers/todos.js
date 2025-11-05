@@ -291,5 +291,55 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+// 할일 삭제 라우터
+router.delete('/:id', async (req, res) => {
+    try {
+        // 데이터베이스 연결 확인
+        const db = req.db;
+        if (!db) {
+            return res.status(500).json({
+                success: false,
+                message: '데이터베이스 연결이 없습니다.'
+            });
+        }
+
+        // ID 파라미터 추출
+        const { id } = req.params;
+
+        // ObjectId 유효성 검증
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: '유효하지 않은 ID 형식입니다.'
+            });
+        }
+
+        // todos 컬렉션에서 삭제
+        const todosCollection = db.collection('todos');
+        const result = await todosCollection.deleteOne({ _id: new ObjectId(id) });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: '할일을 찾을 수 없습니다.'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: '할일이 삭제되었습니다.',
+            data: { id }
+        });
+
+    } catch (error) {
+        console.error('할일 삭제 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '할일 삭제 중 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
 export default router;
 
