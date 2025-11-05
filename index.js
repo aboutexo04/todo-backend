@@ -2,13 +2,14 @@
 import express from 'express';
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
+import cors from 'cors';
 import todosRouter from './routers/todos.js';
 
 // 환경 변수 로드
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 
 // MongoDB 연결 설정
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
@@ -17,8 +18,31 @@ const DB_NAME = process.env.DB_NAME || 'todo_db';
 let db = null;
 let mongoClient = null;
 
+// CORS 설정 - 프론트엔드에서의 요청 허용 (개발 환경: 모든 localhost 포트 허용)
+app.use(cors({
+    origin: (origin, callback) => {
+        // 개발 환경: localhost에서 오는 모든 요청 허용
+        // origin이 없는 경우도 허용 (같은 origin 또는 서버 간 통신)
+        if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+            callback(null, true);
+        } else {
+            callback(null, true); // 개발 환경에서는 모든 origin 허용
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
+
 // JSON 미들웨어
 app.use(express.json());
+
+// 요청 로깅 미들웨어 (디버깅용)
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - Origin: ${req.headers.origin || 'none'}`);
+    next();
+});
 
 // DB 접근을 위한 미들웨어
 app.use((req, res, next) => {
@@ -28,6 +52,8 @@ app.use((req, res, next) => {
 
 // 라우터 연결
 app.use('/todos', todosRouter);
+app.use('/api/todos', todosRouter); // 프론트엔드 호환성을 위한 추가 경로
+app.use('/api/v1/todos', todosRouter); // 프론트엔드 호환성을 위한 추가 경로
 
 // MongoDB 연결 함수
 async function connectToMongoDB() {
