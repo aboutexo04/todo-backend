@@ -82,8 +82,14 @@ async function disconnectFromMongoDB() {
     }
 }
 
-// 서버 재시작 함수
+// 서버 재시작 함수 (개발 환경에서만 사용)
 function restartServer() {
+    if (process.env.NODE_ENV === 'production') {
+        // 프로덕션 환경에서는 서버를 종료하지 않고 재연결만 시도
+        console.log('⚠️ MongoDB 연결 실패. 재연결 시도 중...');
+        reconnectToMongoDB();
+        return;
+    }
     console.log('서버 재시작 중...');
     setTimeout(async () => {
         await disconnectFromMongoDB();
@@ -94,6 +100,9 @@ function restartServer() {
 // MongoDB 연결 상태 확인 및 재연결
 async function checkConnection() {
     try {
+        if (!db) {
+            return false;
+        }
         await db.admin().ping();
         return true;
     } catch (error) {
@@ -141,21 +150,31 @@ app.get('/health', async (req, res) => {
 
 // 서버 시작
 async function startServer() {
-    // MongoDB 연결 시도
-    const connected = await connectToMongoDB();
+    // MongoDB 연결 시도 (비동기, 실패해도 서버는 시작)
+    connectToMongoDB().then(connected => {
+        if (!connected) {
+            console.log('⚠️ MongoDB 연결 실패. 백그라운드에서 재시도 중...');
+            // 백그라운드에서 주기적으로 재연결 시도
+            const reconnectInterval = setInterval(async () => {
+                const reconnected = await connectToMongoDB();
+                if (reconnected) {
+                    console.log('✅ MongoDB 재연결 성공!');
+                    clearInterval(reconnectInterval);
+                }
+            }, 10000); // 10초마다 재시도
+        } else {
+            console.log('✅ MongoDB 연결 성공!');
+        }
+    }).catch(error => {
+        console.error('❌ MongoDB 연결 오류:', error.message);
+    });
 
-    if (!connected) {
-        console.log('MongoDB 연결 실패. 5초 후 재시작...');
-        setTimeout(() => {
-            restartServer();
-        }, 5000);
-        return;
-    }
-
-    // 서버 시작
-    const server = app.listen(PORT, () => {
-        console.log(`🚀 Server is running on http://localhost:${PORT}`);
-        console.log(`📊 MongoDB: ${MONGODB_URI}/${DB_NAME}`);
+    // 서버 시작 (MongoDB 연결 상태와 관계없이)
+    const server = app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server is running on port ${PORT}`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`📊 MongoDB: ${MONGODB_URI}/${DB_NAME}`);
+        }
     });
 
     // Graceful shutdown
@@ -179,9 +198,10 @@ async function startServer() {
 // 에러 핸들링
 process.on('unhandledRejection', (error) => {
     console.error('Unhandled Rejection:', error);
-    // MongoDB 연결 오류인 경우 재시작
-    if (error.message.includes('Mongo')) {
-        restartServer();
+    // MongoDB 연결 오류인 경우 재연결 시도 (프로덕션에서는 서버 종료하지 않음)
+    if (error.message && error.message.includes('Mongo')) {
+        console.log('⚠️ MongoDB 연결 오류 감지. 재연결 시도 중...');
+        reconnectToMongoDB();
     }
 });
 
