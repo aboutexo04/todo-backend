@@ -128,17 +128,23 @@ async function checkConnection() {
         await db.admin().ping();
         return true;
     } catch (error) {
-        console.error('MongoDB 연결 상태 확인 실패:', error.message);
+        if (process.env.NODE_ENV !== 'production') {
+            console.error('MongoDB 연결 상태 확인 실패:', error.message);
+        }
         return false;
     }
 }
 
 // MongoDB 재연결 시도
 async function reconnectToMongoDB() {
-    console.log('MongoDB 재연결 시도...');
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('MongoDB 재연결 시도...');
+    }
     const connected = await connectToMongoDB();
     if (!connected) {
-        console.log('재연결 실패. 서버 재시작 예정...');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('재연결 실패. 서버 재시작 예정...');
+        }
         restartServer();
     }
 }
