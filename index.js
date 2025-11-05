@@ -15,6 +15,14 @@ const PORT = process.env.PORT || 5003;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'todo_db';
 
+// 환경 변수 확인 로그
+if (process.env.NODE_ENV === 'production') {
+    console.log('환경 변수 확인:');
+    console.log(`MONGODB_URI: ${MONGODB_URI ? '설정됨' : '설정되지 않음'}`);
+    console.log(`DB_NAME: ${DB_NAME}`);
+    console.log(`PORT: ${process.env.PORT || '기본값 사용'}`);
+}
+
 let db = null;
 let mongoClient = null;
 let isConnecting = false; // 연결 시도 중 플래그
@@ -182,7 +190,10 @@ app.get('/', (req, res) => {
     res.json({
         message: 'Todo Backend API Server',
         status: 'running',
-        mongodb: db ? 'connected' : 'disconnected'
+        mongodb: db ? 'connected' : 'disconnected',
+        mongoDbUri: process.env.MONGODB_URI ? 'set' : 'not set',
+        dbName: DB_NAME,
+        nodeEnv: process.env.NODE_ENV || 'development'
     });
 });
 
