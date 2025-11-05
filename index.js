@@ -94,9 +94,14 @@ async function connectToMongoDB() {
         const uriDisplay = MONGODB_URI.replace(/\/\/.*@/, '//***:***@');
         console.log(`MongoDB URI: ${uriDisplay}`);
         
+        // MongoDB 연결 옵션 (메모리 최적화 및 SSL 설정)
         mongoClient = new MongoClient(MONGODB_URI, {
-            serverSelectionTimeoutMS: 10000, // 10초 타임아웃
-            connectTimeoutMS: 10000
+            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 10000,
+            maxPoolSize: 2, // 최소 연결 풀 크기 (메모리 절약)
+            minPoolSize: 0, // 최소 연결 없음 (메모리 절약)
+            maxIdleTimeMS: 30000, // 30초 후 유휴 연결 종료
+            // SSL/TLS 설정 (mongodb+srv:// URI는 자동으로 SSL 사용)
         });
         
         await mongoClient.connect();
@@ -176,8 +181,8 @@ async function reconnectToMongoDB() {
     }
 }
 
-// 주기적으로 연결 상태 확인 (프로덕션에서는 60초마다, 개발에서는 30초마다)
-const checkInterval = process.env.NODE_ENV === 'production' ? 60000 : 30000;
+// 주기적으로 연결 상태 확인 (프로덕션에서는 2분마다, 개발에서는 30초마다 - 메모리 절약)
+const checkInterval = process.env.NODE_ENV === 'production' ? 120000 : 30000;
 setInterval(async () => {
     if (!await checkConnection()) {
         await reconnectToMongoDB();
