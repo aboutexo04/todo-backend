@@ -72,17 +72,19 @@ async function connectToMongoDB() {
         return false;
     }
     
+    // 환경 변수 확인
+    if (!MONGODB_URI || MONGODB_URI === 'mongodb://localhost:27017') {
+        console.error('❌ MONGODB_URI 환경 변수가 설정되지 않았습니다.');
+        return false;
+    }
+    
     try {
         isConnecting = true;
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('MongoDB 연결 시도 중...');
-        }
+        console.log('MongoDB 연결 시도 중...');
         mongoClient = new MongoClient(MONGODB_URI);
         await mongoClient.connect();
         db = mongoClient.db(DB_NAME);
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('연결성공!');
-        }
+        console.log('✅ MongoDB 연결 성공!');
         isConnecting = false;
         return true;
     } catch (error) {
@@ -183,32 +185,24 @@ async function startServer() {
     const connected = await connectToMongoDB();
     
     if (!connected) {
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('⚠️ MongoDB 초기 연결 실패. 백그라운드에서 재시도 중...');
-        }
+        console.log('⚠️ MongoDB 초기 연결 실패. 서버는 시작되지만 DB 연결은 백그라운드에서 재시도됩니다.');
         // 백그라운드에서 주기적으로 재연결 시도 (프로덕션에서는 30초마다)
         const reconnectInterval = process.env.NODE_ENV === 'production' ? 30000 : 10000;
         const reconnectTimer = setInterval(async () => {
             const reconnected = await connectToMongoDB();
             if (reconnected) {
-                if (process.env.NODE_ENV !== 'production') {
-                    console.log('✅ MongoDB 재연결 성공!');
-                }
+                console.log('✅ MongoDB 재연결 성공!');
                 clearInterval(reconnectTimer);
             }
         }, reconnectInterval);
     } else {
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('✅ MongoDB 연결 성공!');
-        }
+        console.log('✅ MongoDB 연결 성공!');
     }
 
     // 서버 시작
     const server = app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server is running on port ${PORT}`);
-        if (process.env.NODE_ENV !== 'production') {
-            console.log(`📊 MongoDB: ${MONGODB_URI}/${DB_NAME}`);
-        }
+        console.log(`📊 Health check: http://localhost:${PORT}/health`);
     });
 
     // Graceful shutdown
