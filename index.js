@@ -17,6 +17,7 @@ const DB_NAME = process.env.DB_NAME || 'todo_db';
 
 let db = null;
 let mongoClient = null;
+let isConnecting = false; // 연결 시도 중 플래그
 
 // CORS 설정 - 프론트엔드에서의 요청 허용 (개발 환경: 모든 localhost 포트 허용)
 app.use(cors({
@@ -44,8 +45,13 @@ app.use((req, res, next) => {
     next();
 });
 
-// DB 접근을 위한 미들웨어
-app.use((req, res, next) => {
+// DB 접근을 위한 미들웨어 (연결이 없으면 재연결 시도)
+app.use(async (req, res, next) => {
+    if (!db && !isConnecting) {
+        // DB가 없고 연결 시도 중이 아니면 재연결 시도
+        console.log('⚠️ DB 연결이 없습니다. 재연결 시도 중...');
+        await connectToMongoDB();
+    }
     req.db = db;
     next();
 });
@@ -57,15 +63,23 @@ app.use('/api/v1/todos', todosRouter); // 프론트엔드 호환성을 위한 �
 
 // MongoDB 연결 함수
 async function connectToMongoDB() {
+    // 이미 연결 중이면 기다림
+    if (isConnecting) {
+        return false;
+    }
+    
     try {
+        isConnecting = true;
         console.log('MongoDB 연결 시도 중...');
         mongoClient = new MongoClient(MONGODB_URI);
         await mongoClient.connect();
         db = mongoClient.db(DB_NAME);
         console.log('연결성공!');
+        isConnecting = false;
         return true;
     } catch (error) {
         console.error('❌ MongoDB 연결 실패:', error.message);
+        isConnecting = false;
         return false;
     }
 }
@@ -150,26 +164,25 @@ app.get('/health', async (req, res) => {
 
 // 서버 시작
 async function startServer() {
-    // MongoDB 연결 시도 (비동기, 실패해도 서버는 시작)
-    connectToMongoDB().then(connected => {
-        if (!connected) {
-            console.log('⚠️ MongoDB 연결 실패. 백그라운드에서 재시도 중...');
-            // 백그라운드에서 주기적으로 재연결 시도
-            const reconnectInterval = setInterval(async () => {
-                const reconnected = await connectToMongoDB();
-                if (reconnected) {
-                    console.log('✅ MongoDB 재연결 성공!');
-                    clearInterval(reconnectInterval);
-                }
-            }, 10000); // 10초마다 재시도
-        } else {
-            console.log('✅ MongoDB 연결 성공!');
-        }
-    }).catch(error => {
-        console.error('❌ MongoDB 연결 오류:', error.message);
-    });
+    // MongoDB 연결 시도 (최대 10초 대기)
+    console.log('MongoDB 연결 시도 중...');
+    const connected = await connectToMongoDB();
+    
+    if (!connected) {
+        console.log('⚠️ MongoDB 초기 연결 실패. 백그라운드에서 재시도 중...');
+        // 백그라운드에서 주기적으로 재연결 시도
+        const reconnectInterval = setInterval(async () => {
+            const reconnected = await connectToMongoDB();
+            if (reconnected) {
+                console.log('✅ MongoDB 재연결 성공!');
+                clearInterval(reconnectInterval);
+            }
+        }, 10000); // 10초마다 재시도
+    } else {
+        console.log('✅ MongoDB 연결 성공!');
+    }
 
-    // 서버 시작 (MongoDB 연결 상태와 관계없이)
+    // 서버 시작
     const server = app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server is running on port ${PORT}`);
         if (process.env.NODE_ENV !== 'production') {
